@@ -20,6 +20,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -28,11 +29,16 @@ public class LightTokenAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTH_HEADER = "X-Auth-Token";
     private static final String AUTHORIZATION = "Authorization";
 
-    @Value("${application.authentication.hmac-secreet}")
+    @Value("${application.authentication.hmac-secret:qweqweqeqweqweqweqweqweqwqwqeqweqweqweqweqwe}")
     private String hmacSecret;
 
-    @Value("${application.authentication.token-expired}")
+    @Value("${application.authentication.token-expired:1000}")
     private Long maxTokenAgeSeconds;
+
+    @Value("${application.authentication.service-name:demo1}")
+    private String serviceName;
+
+    private List<String> allowedServices = List.of("demo1", "demo2");
 
     private final ConcurrentHashMap<String, Long> recentNonces = new ConcurrentHashMap<>();
 
@@ -48,6 +54,8 @@ public class LightTokenAuthenticationFilter extends OncePerRequestFilter {
             if (!StringUtils.hasLength(jwtToken)) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing token");
             }
+            Authentication auth = new LightTokenAuthentication("ADMIN", serviceName);
+            SecurityContextHolder.getContext().setAuthentication(auth);
             filterChain.doFilter(request, response);
             return;
         }
@@ -67,6 +75,9 @@ public class LightTokenAuthenticationFilter extends OncePerRequestFilter {
     private void verifyToken(LightToken token) throws Exception {
         long now = Instant.now().getEpochSecond();
 
+        if (!allowedServices.contains(token.getService())) {
+            throw new SecurityException("Service not allowed");
+        }
         if (now - token.getTimestamp() > maxTokenAgeSeconds) {
             throw new SecurityException("Token expired");
         }

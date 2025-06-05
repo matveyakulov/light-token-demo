@@ -2,6 +2,7 @@ package ru.matveyakulov.interceptor;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,8 +16,11 @@ import java.util.UUID;
 @Component
 public class LightTokenRequestInterceptor implements RequestInterceptor {
 
-    private static final String SERVICE_NAME = "svc-demo";
-    private static final String HMAC_SECRET = "very-secret-key";
+    @Value("${application.authentication.hmac-secret:qweqweqeqweqweqweqweqweqwqwqeqweqweqweqweqwe}")
+    private String hmacSecret;
+
+    @Value("${application.authentication.service-name:demo2}")
+    private String serviceName;
 
     @Override
     public void apply(RequestTemplate template) {
@@ -29,8 +33,8 @@ public class LightTokenRequestInterceptor implements RequestInterceptor {
         String nonce = UUID.randomUUID().toString();
         String username = getCurrentUsername();
 
-        String payload = String.join("|", SERVICE_NAME, timestamp, username, nonce);
-        String signature = hmacSha256(payload, HMAC_SECRET);
+        String payload = String.join("|", serviceName, timestamp, username, nonce);
+        String signature = hmacSha256(payload, hmacSecret);
 
         String fullToken = payload + "|" + signature;
         return Base64.getEncoder().encodeToString(fullToken.getBytes());
